@@ -1,13 +1,17 @@
+=================
+ Absenteeism at work prediction
+================
+
 ---
 title: |
-  | Prediction of Absenteeism 
+  Prediction of Absenteeism 
 subtitle: (CSE780 project)
 author: Paria Fakhrzad - Program of Computational Science and Engineering - McMaster University 
 date: "12/01/2021"
 output: 
   beamer_presentation:
 fontsize: 11pt
-bibliography: Project.bib | 
+bibliography: Project.bib 
 ---
 ```{r}
 library(dplyr)
