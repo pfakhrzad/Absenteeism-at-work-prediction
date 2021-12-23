@@ -2,17 +2,11 @@
 title: |
   | Prediction of Absenteeism 
 subtitle: (CSE780 project)
-author: Paria Fakhrzad - Student ID 400353290 \hspace{10in} Program of Computational Science and Engineering \hspace{10in}  McMaster University 
+author: Paria Fakhrzad - Program of Computational Science and Engineering - McMaster University 
 date: "12/01/2021"
 output: 
   beamer_presentation:
-    theme: "Madrid"
-    colortheme: "beaver"
-    fonttheme: "Default"
-    slide_level: 2
-    includes:
-      in_header: header.tex
-fontsize: 12pt
+fontsize: 11pt
 bibliography: Project.bib
 nocite: | 
 ---
