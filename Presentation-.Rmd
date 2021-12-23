@@ -145,7 +145,7 @@ knitr::kable(head(Absence_df[,12:21]),align=c("c","c","c","c","c","c","c","c","c
 
 
 \tiny
-![count of Absence reason](figure4.png){width=50%}|![count of Absence reason](figure5.png){width=50%}
+![count of Absence reason](Reasons.png){width=50%}|![count of Absence reason](Children.png){width=50%}
 
 
 ## Methods- Classification
