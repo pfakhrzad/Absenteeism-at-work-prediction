@@ -44,6 +44,7 @@ library(pls)
 library(gridExtra)
 library(mgcv)         #GAM
 library(randomForest) #Random Forest
+```
 
 ## Outline
  - Data exploration
