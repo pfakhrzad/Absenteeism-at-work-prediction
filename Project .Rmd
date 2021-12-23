@@ -1,0 +1,747 @@
+---
+title: " Supplementry- Prediction of Absenteeism   Project-CSE780"
+author: "Paria Fakhrzad Student ID 400353290"
+date: "10/24/2021"
+output: 
+  pdf_document:
+    toc: true
+bibliography: Project.bib
+fontsize: 12pt
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  fig.width = 7,
+  fig.height = 4,
+  message=FALSE, 
+  warning=FALSE,
+  results = "hide",
+  fig.show="hide")
+#knitr::write_bib(c('dplyr','readr','Hmisc','ggplot2','corrplot','PreProcess','tree','boot','randomForest'),file ='Project.bib')
+set.seed(0)
+```
+\newpage
+**Load The libraries**
+
+```{r }
+library(dplyr)
+library(Hmisc)
+library(magrittr)
+library(readr)
+library(ggplot2)
+library(ISLR2)
+library(class)
+library(ggpubr)
+library(corrplot)
+library(GGally)
+library(PreProcess)
+library(caTools)
+library(caret)
+library(GGally)       #ggpairs()
+library(PreProcess)
+library(tree)         #tree/CART
+library(MASS)
+library(mclust)       #Gaussian Mixtures
+library(car)
+library(boot)         #CV
+library(e1071)
+library(leaps)
+library(glmnet)
+library(pls)
+library(gridExtra)
+library(mgcv)         #GAM
+library(randomForest) #Random Forest
+library(corrgram)     #corrgram
+library(ROCR)
+library(pROC)
+library(ROCit)
+library(plotROC)
+```
+
+```{r, include=FALSE}
+#Clean the environment
+#rm(list = ls())
+
+#Set working directory
+#setwd("")
+```
+
+# 1- Uploading the dataset
+The main dataset has been downloaded from UCI repository in this link <https://archive.ics.uci.edu/ml/datasets/Absenteeism+at+work#> that is the data of Absenteeism at work for years between 2007-2010.
+ * Read CSV file
+```{r warning=FALSE, message=FALSE , results='hide'}
+#Reading CSV files
+Absence_df<- readr::read_csv("Absenteeism_at_work  UCI.csv")
+
+#Summary of Dataset
+selected <- c("Distance_from_Residence_to_Work","Service_time", "Age",
+              "Work_load_Average/day_","Hit_target","Weight","Height",
+              "Absenteeism_time_in_hours","Transportation_expense")
+
+xtable::xtable(summary(Absence_df[,selected]))
+xtable::xtable(summary(Absence_df[,c("Son","Pet","Body_mass_index")]))
+
+
+# number of rows and columns
+dim(Absence_df)
+
+
+#Structure of dataset
+str(Absence_df)
+
+```
+
+
+# 2- Pre-Processing
+
+* We change the name of columns to be more simple for visualization, also for using in model fitting
+
+```{r results='hide'}
+#Change the Colnames
+colnames(Absence_df) <- c('ID', 'Reason', 'Month', 'Day', 
+'Seasons','Tran_expense', 'Distance', 'Service_time', 'Age','Workload'
+, 'Hit_target', 'Disciplinary_failure', 'Education', 'children', 'drinker'
+, 'smoker', 'pet', 'weight', 'height', 'body_mass', 'hour')
+
+```
+
+* We can add new label for classification purpose:
+```{r}
+median(Absence_df$hour) # median will be separate point that is 3
+Absence_df <- mutate(Absence_df, Absence=ifelse(Absence_df$hour>3,1,0))
+
+# Percent of Absence "True" Label
+sum(Absence_df$Absence)/nrow(Absence_df)*100
+```
+`46%` of observations have absence hour more that median(3)
+
+* With using below function we found that there is no $NA$ dataset.
+```{r results='hide'}
+#Columns that are totally empty
+table(sapply(Absence_df,function(x)all(is.na(x))))
+
+#Columns with NA 
+table(lapply(Absence_df,function(x){length(which(is.na(x)))}))
+
+#Another way for checking missing values
+as.data.frame(colSums(is.na(Absence_df)))
+
+```
+
+* Finding the outlines
+- 3 sample rows  have  month number $0$ that they needs to be adjusted
+```{r results='hide'}
+#Adjusting the non-valid month values
+table(Absence_df$Month)
+Absence_df$Month[Absence_df$Month %in% 0] =3
+
+#Change null reasons with the mode
+table(Absence_df$Reason)
+Absence_df$Reason[Absence_df$Reason %in% 0] =23
+
+```
+* checking the outliers by boxplot
+```{r}
+boxplot(Absence_df$Tran_expense,col = "lightBlue",xlab="Transportation cost")
+
+boxplot(Absence_df$pet, col="lightBlue",xlab="Pet")
+
+```
+
+* Imputation of outliers 
+```{r}
+# Transportation expense 
+Absence_df$Tran_expense[Absence_df$Tran_expense>370] <- 360
+
+# Pet
+Absence_df$pet[Absence_df$pet>4] <- 4
+```
+
+
+# 3- Data Exploration
+
+In this part We are going to check the multicollinearity  between  numeric features:
+```{r results='hide', eval=FALSE}
+#Correlation
+rcorr(as.matrix(Absence_df))
+
+#separate numeric columns
+numeric = sapply(Absence_df, is.numeric)
+Absence_numeric= Absence_df[,numeric]
+
+plot2 <-ggpairs(Absence_df[,c("Age","Tran_expense","Distance","Service_time",
+         "Workload","Hit_target","children","pet","weight","height","body_mass","hour")],
+         ggplot2::aes(colour=as.factor(Absence_df$Absence)),
+         upper = list(continuous = wrap("cor",size = 2, alignPercent = 1)))
+plot2
+
+plot1<- corrgram(Absence_numeric[,c("Age","Tran_expense","Distance","Service_time",
+               "Workload","Hit_target","children","pet","weight","height",
+               "body_mass","hour")], order = F,
+               upper.panel=panel.pie, lower.panel = panel.number(),
+         text.panel=panel.txt, main = "Correlation Plot")
+
+ggsave("figure2.png",plot2,width = 7, height = 4)
+
+```
+We can see between body_mass and height and weight there are correlation so we will remove this.
+
+* In this part we used Chi-square test to see the correlation between factor columns
+```{r}
+chisq.test(Absence_df$Reason,Absence_df$Month)
+chisq.test(Absence_df$Reason,Absence_df$Disciplinary_failure)
+chisq.test(Absence_df$Reason,Absence_df$Education)
+chisq.test(Absence_df$Reason,Absence_df$drinker)
+chisq.test(Absence_df$Reason,Absence_df$smoker)
+```
+all of P-values are less than 0.05.
+
+*  Distribution of factor features
+```{r}
+#Reason Distribution 
+reason<-as.data.frame(xtabs(~Reason,Absence_df))
+plot(reason)
+
+#Reason of absence box_plot
+plot3 <- ggplot(Absence_df,aes_string(x=as.factor(Absence_df$Reason),
+               y=Absence_df$hour))+geom_boxplot()+xlab('Reason')+
+  ylab('Hour of absence')
+
+#change the factor for having clear plot
+Absence_df$Absence<-ifelse(Absence_df$Absence==0,"short", "long")
+
+plot4 <- ggplot(Absence_df,aes(x=Reason,fill=factor(Absence)))+
+  geom_bar(stat="count")+
+  stat_count(geom = "text", colour = "black", size = 3.5,
+aes(label = ..count..),position=position_stack(vjust=0.5))+
+  labs( x = "Reason of Absence", y = "Count of reasons", fill = "Absence length")+
+  scale_x_continuous(labels=Absence_df$Reason, breaks=Absence_df$Reason)
+
+ggsave("figure3.png",plot3,width = 7, height = 5)
+ggsave("figure4.png",plot4,width = 7, height = 4)
+
+#Showing Plot beside eachother
+#gridExtra::grid.arrange(graph1, graph2,ncol=2)
+
+```
+
+* Distribution of numerical data by histogram
+```{r}
+#Distribution of hour for checking normality
+plot5<-ggplot(Absence_df, aes(x=hour))+geom_bar()+
+  ggtitle("Distribution of absence hour ")+theme_classic()
+
+plot5
+
+plot6<-hist(Absence_df$hour,breaks=100 ,density=100,prob=TRUE, col="lightblue",
+     xlab="Absence hours distribution", 
+     main="Distribution of hours of absence from work")
+lines(density(Absence_df$hour))
+
+plot6
+
+```
+
+In This plot , we can see that IDs that touched the target tends to be absence more.
+```{r}
+plot7<-ggplot(Absence_df, aes(x=ID, y= hour ))+
+         geom_bar(stat='identity')+facet_grid(.~Hit_target)
+plot7
+```
+
+* Ploting histogram of continouse variables 
+```{r results='hide', eval=FALSE}
+#Transportation expense 
+hist(Absence_df$Tran_expense,prob = TRUE,breaks=10 ,density=100,col="lightblue",xlab = 'Transportation expense',main="Distribution of Transportation expense")
+lines(density(Absence_df$Tran_expense))
+
+#Age 
+hist(Absence_df$Age,prob = TRUE,breaks=10 ,density=100,col="lightblue",xlab = 'Transportation expense',main="Distribution of Age")
+lines(density(Absence_df$Age))
+
+#Hit target
+hist(Absence_df$Hit_target,prob = TRUE,breaks=10 ,density=100,col="lightblue",xlab = 'Hit_target',main="Distribution of Hit_target")
+lines(density(Absence_df$Hit_target))
+
+#Distance
+hist(Absence_df$Distance,prob = TRUE,breaks=10 ,density=100,col="lightblue",xlab = 'Distance',main="Distribution of Distance")
+lines(density(Absence_df$Distance))
+
+```
+
+
+```{r,  results='hide', eval=FALSE}
+# children and absence hours
+plot9 <-ggscatter(Absence_df,x ='children',y ='hour', color  = 'Day',
+          add = "reg.line", conf.int = TRUE, 
+          cor.coef = TRUE, cor.method = "pearson")
+plot9
+
+ggsave("figure5.png",plot9, width=7, height=5)
+```
+
+
+```{r results='hide',  eval=FALSE}
+
+# Transportation expense and hours
+plot10 <-ggplot(Absence_df,
+                aes(x =Tran_expense, y=hour, colour= factor(Day)))+
+  geom_line()+
+  facet_wrap(.~Month,
+             labeller = as_labeller( c('1'="Jan",'2'="Feb",
+                                       '3'="March","4"="April",
+                                       "5"="May","6"="June","7"="July",
+                                       "8"="Aug","9"="Sep","10"="Oct",
+                                       "11"="Nov","12"="Dec")))+
+  labs( x = "Transportation Expense",
+        y = "Hour of Absence",
+        color = "Day of week")+
+  scale_color_manual(labels=c("Monday","Tuesday","Wednesday","Thursday","Friday"), 
+                    values=c("red","blue","darkorange","darkGreen","purple"))
+
+plot10
+ggsave("figure6.png",plot10, width=10, height=6)
+```
+
+
+
+# 4- Classification Models
+* Feature Scaling
+
+```{r}
+#Change target variable to factor 
+Absence_df$Absence<- ifelse(Absence_df$Absence=="short",0, 1)
+
+```
+
+* Normalize dataset
+```{r}
+#remove ID
+Absence_df<-Absence_df[,-1]
+Absence_Scaled_df <-Absence_df
+Absence_Scaled_df[c(5,6,7,8,9,10,13,16,17,18,19)] <-
+  scale(Absence_Scaled_df[c(5,6,7,8,9,10,13,16,17,18,19)])
+```
+
+* Here we make dummy features from reason column
+```{r}
+#transform factor variables
+Absence_Scaled_df$Reason <- as.factor(as.character(Absence_Scaled_df$Reason))
+Absence_Scaled_df$Month <- as.factor(as.character(Absence_Scaled_df$Month))
+Absence_Scaled_df$Day <- as.factor(as.character(Absence_Scaled_df$Day))
+Absence_Scaled_df$Seasons <- as.factor(as.character(Absence_Scaled_df$Seasons))
+Absence_Scaled_df$Disciplinary_failure <-
+  as.factor(as.character(Absence_Scaled_df$Disciplinary_failure))
+Absence_Scaled_df$Education <- as.factor(as.character(Absence_Scaled_df$Education))
+Absence_Scaled_df$drinker <- as.factor(as.character(Absence_Scaled_df$drinker))
+Absence_Scaled_df$smoker <- as.factor(as.character(Absence_Scaled_df$smoker))
+
+#Dummy features 
+Absence_df_Dummy <- as.data.frame(model.matrix(~.,Absence_Scaled_df))
+Absence_df_Dummy <-Absence_df_Dummy[,-1]
+```
+
+
+* Split Data 
+```{r}
+set.seed(1)
+
+#Split of Scaled data
+ ts_split <- createDataPartition(Absence_df_Dummy$Absence, p = 0.8, list = FALSE)
+ train_c <- Absence_df_Dummy[ts_split,]
+ test_c <- Absence_df_Dummy[-ts_split,]
+ 
+ #Split of main data
+ts_split <- createDataPartition(Absence_df$Absence, p = 0.8, list = FALSE)
+ train_c2 <- Absence_df[ts_split,]
+ test_c2 <- Absence_df[-ts_split,]
+ 
+ #check the split accuracy
+table(train_c$Absence)/sum(table(train_c$Absence))
+table(test_c$Absence)/sum(table(test_c$Absence))
+table(train_c2$Absence)/sum(table(train_c2$Absence))
+table(test_c2$Absence)/sum(table(test_c2$Absence))
+```
+
+* Here we just consider 10 features that we selected from part6 that is related to Feature selection
+```{r}
+Absence_selected_df <-Absence_Scaled_df[,c(1,3,8,11,12,13,14,15,19,20,21)]
+#transform factor variables
+Absence_selected_df$Reason <- as.factor(as.character(Absence_selected_df$Reason))
+Absence_selected_df$Disciplinary_failure <-
+  as.factor(as.character(Absence_selected_df$Disciplinary_failure))
+Absence_selected_df$Education <- as.factor(as.character(Absence_selected_df$Education))
+Absence_selected_df$smoker <- as.factor(as.character(Absence_selected_df$smoker))
+
+#Dummy features 
+Absence_selected_Dummy <- as.data.frame(model.matrix(~.,Absence_selected_df))
+Absence_selected_Dummy <-Absence_selected_Dummy[,-1]
+
+#Split data
+set.seed(1)
+ts_split_selected <- createDataPartition(Absence_selected_Dummy$Absence,
+                                         p = 0.8, list = FALSE)
+ train_selected_c <- Absence_selected_Dummy[ts_split_selected,]
+ test_selected_c <- Absence_selected_Dummy[-ts_split_selected,]
+ train_selected_c <-train_selected_c[,-40]
+ test_selected_c <-test_selected_c[,-40]
+#check the split accuracy
+table(train_selected_c$Absence)/sum(table(train_selected_c$Absence))
+table(test_selected_c$Absence)/sum(table(test_selected_c$Absence))
+
+```
+
+## 4.1- Logistic Regression
+```{r}
+set.seed(1)
+#Logistic regression 
+LR_model<- glm(Absence~ .-hour-Reason3,
+                data =  train_c,
+                family = binomial("logit"))
+
+LR_predict <-predict(LR_model, newdata = test_c, type = "response")
+
+predicted_data <- data.frame(probability2=LR_predict, probability=LR_predict,
+                             Absence=test_c$Absence,Absence2=test_selected_c$Absence)
+
+predicted_data$probability=ifelse(predicted_data$probability>.4,1,0)
+
+#Accuracy
+mean(predicted_data$probability==predicted_data$Absence)
+
+#Interpret the output
+summary(LR_model)
+```
+
+Accuracy for test dataset is `84.45%`.
+
+rebuild the model with selected features
+```{r}
+#Logistic regression with selected features
+LR_model2<- glm(Absence~ .-Reason3-Reason2,
+                data =  train_selected_c,
+                family = binomial("logit"))
+LR_predict2<-predict(LR_model2, newdata = test_selected_c, type = "response")
+
+predicted_data$probability2 <- LR_predict2
+predicted_data$probability2=ifelse(predicted_data$probability2>.60,1,0)
+
+#Accuracy
+mean(predicted_data$probability2==predicted_data$Absence2)
+
+#Interpret the output
+summary(LR_model2)
+```
+
+ * Cross Validation
+   * K-fold Logistic Regression
+```{r , warning=FALSE, eval=FALSE}
+set.seed(0)
+# fit with whole dataset
+LR_model_cv <- glm(Absence~ .-hour-Reason3,
+                data =  Absence_df_Dummy,
+                family =binomial("logit"))
+# MSE per K
+set.seed(0)
+cv.glm(Absence_df_Dummy, LR_model_cv, K=5)$delta[1]
+LR_CV_table <- data.frame(matrix(ncol = 2, nrow= 0))
+colnames(LR_CV_table) <- c('k', 'MSE')
+for(i in seq(from = 3, to = 20, by = 1)){
+ LR_CV_table[i,'k'] <- i
+ LR_CV_table[i,'MSE'] <- cv.glm(Absence_df_Dummy, LR_model_cv, K=i)$delta[1]
+}
+LR_CV_table
+plotcv<- ggplot(LR_CV_table[3:20,],aes(x=k, y=MSE))+geom_line()
+ggsave("plotcv.png",plotcv, width=5, height=3)
+plotcv
+```
+We can see that the first drop is in k=7 and deviation here is 142
+
+## 4.2- Classification Tree 
+```{r}
+train_c$Absence<-as.factor(train_c$Absence)
+test_c$Absence<-as.factor(test_c$Absence)
+
+# Fit
+Tree_model <- tree(Absence~.-hour,data=train_c)
+
+#Predict
+Tree_predict <- predict(Tree_model, test_c, type = "class")
+
+#Interpret the output
+plot(Tree_model)
+text(Tree_model, pretty = 1)
+
+#Accuracy
+mean(Tree_predict==test_c$Absence)
+
+```
+Accuracy of train data is `84%`. and in  test data is `83.1%`.Residual mean deviance is 0.73.
+
+
+* rebuild using of just selected features
+```{r}
+train_selected_c$Absence<-as.factor(train_selected_c$Absence)
+test_selected_c$Absence<-as.factor(test_selected_c$Absence)
+
+# Fit
+Tree_model2 <- tree(Absence~.,data=train_selected_c)
+
+#Predict
+Tree_predict2 <- predict(Tree_model2, test_selected_c, type = "class")
+
+#Interpret the outptut
+plot(Tree_model2)
+text(Tree_model2, pretty = 1)
+
+#Accuracy
+mean(Tree_predict2==test_selected_c$Absence)
+
+
+```
+
+* Cross Validation 
+ here we use CV to find the optimal nodes for this tree
+```{r}
+#Pruning
+Tree_cv <- cv.tree(Tree_model,FUN = prune.misclass)
+Tree_cv
+plot(Tree_cv$size, Tree_cv$dev, type = "b") 
+```
+tree with 8 terminal nodes have minimum cross-validation errors that is 118 and is less than Logistic regression CV
+So we cut the tree with 9 nodes and we can see the result:
+```{r}
+prune.Tree <- prune.misclass(Tree_model2, best = 8)  
+
+plot(prune.Tree)
+text(prune.Tree, pretty = 0)
+
+Tree_predict3 <- predict(prune.Tree, test_selected_c, type = "class")
+
+#Accuracy
+mean(Tree_predict3==test_selected_c$Absence)
+```
+we can see that with less number of nodes that is more interpretable, we have the same test accuracy rate that is `85.13%`.
+
+## 4.3- Random forest
+```{r}
+bag_model <- randomForest(Absence~.,data=train_selected_c,
+                           mtry=13,importance=TRUE,type="class")
+bag_model
+predict_bag <- predict(bag_model,test_selected_c,type="class")
+
+#Accuracy
+mean(predict_bag==test_selected_c$Absence)
+```
+Train accuracy is 81% and test accuracy is 74% and both are less than decision tree.
+
+## 4.4- LDA
+```{r}
+#fit
+lda_model <- lda(Absence ~.-Reason3,data=train_selected_c)
+
+#predict
+lda_predict <- predict(lda_model,test_selected_c)
+
+#Accuracy
+mean(lda_predict$class==test_selected_c$Absence)
+
+```
+The accuracy of LDA is 83.7% that is less than classification tree
+
+# 5- Regression Models
+* Split Data 
+```{r}
+#Split of Scaled data
+ ts_split_R <- createDataPartition(Absence_df_Dummy$hour, p = 0.8, list = FALSE)
+ train_R <- Absence_df_Dummy[ts_split_R,-63]
+ test_R <- Absence_df_Dummy[-ts_split_R,-63]
+ 
+ 
+ts_split_R_selected <- createDataPartition(Absence_selected_Dummy$hour,
+                                           p = 0.8, list = FALSE)
+ train_selected_R <- Absence_selected_Dummy[ts_split_R_selected,-41]
+ test_selected_R <- Absence_selected_Dummy[-ts_split_R_selected,-41]
+ 
+```
+
+## 5.1- Multiple Linear Regression
+```{r}
+#fit
+lm_model <- lm(hour ~.-Reason3-Reason2-Reason17, data = train_R)
+
+#predict
+lm_predict <- predict(lm_model, newdata = test_R)
+
+#Linear Regression MSE
+#mean((lm_predict - test_R$hour)^2)
+library("forecast")
+print(postResample(pred = lm_predict, obs = test_R$hour))
+forecast::accuracy(test_R$hour,lm_predict)
+
+#Linear Regression Rsq
+summary(lm_model)$r.sq
+#summary(lm_model)
+#vif(lm_model)
+```
+
+$R^2=.30$ and, $RMSE=17.73$ , $MAE=6.75$
+
+rebuild linear regression based on selected features
+```{r}
+#fit
+lm_model2 <- lm(hour ~.-Reason2-Reason3, data = train_selected_R)
+
+#predict
+lm_predict2 <- predict(lm_model2, newdata = test_selected_R)
+
+#Linear Regression MSE
+#mean((lm_predict - test_R$hour)^2)
+print(postResample(pred = lm_predict2, obs = test_selected_R$hour))
+
+#Linear Regression Rsq
+summary(lm_model2)$r.sq
+summary(lm_model2)
+#vif(lm_model2)
+```
+
+$R^2=.33$ and, $RMSE=15.24$ , $MAE=6.79$
+
+
+```{r}
+#Residuals Vs fitted values
+plot(predict(lm_model), residuals(lm_model))
+```
+
+## 5.2- Regression Tree
+```{r}
+#Fit the tree model
+Tree_model_r <- tree(hour ~., data = train_selected_R)
+
+#Predict 
+Tree_predict_r <-predict(Tree_model_r,newdata = test_selected_R)
+
+#Interpret the outptut
+plot(Tree_model_r)
+text(Tree_model_r, pretty = 0)
+summary(Tree_model_r)
+
+#MSE
+print(postResample(pred = Tree_predict_r, obs = test_selected_R$hour))
+
+#prune tree
+prune.Tree2 <- prune.tree(Tree_model_r, best = 8)  
+
+plot(prune.Tree2)
+text(prune.Tree2, pretty = 0)
+
+Tree_predict_r <- predict(prune.Tree2, test_selected_R)
+#MSE
+print(postResample(pred = Tree_predict_r, obs = test_selected_R$hour))
+```
+number of terminal nodes is 16 and Residual mean deviance is 103.1 here. 
+MSE of regression tree is 253 that is more than linear regression and in plot we can see the predicted amount has less accuracy for test dataset. Also the tree is complex for interpret.
+
+```{r}
+test_selected_R$hour[test_selected_R$hour>50] <- 40
+data<- tibble(hour=test_selected_R$hour,
+              predicted_hour1 = lm_predict2,
+              predicted_hour2 = Tree_predict_r )
+data$rank<-1:nrow(data)
+
+Regression<-ggplot(data) +
+  geom_point(aes(x = rank, y = hour), color = "dodgerblue") +
+  geom_line(aes(x = rank, y = predicted_hour1), color = "orange")+
+  geom_line(aes(x = rank, y = predicted_hour2), color = "purple")+
+  xlab("Test Observatins")+
+  ggtitle("Linear Regression(orange) Regression Tree(purple) Vs Actual ")
+
+Regression
+```
+
+## 5.3- Random forest
+```{r}
+# fit the model
+bag_model_r <- randomForest(hour~.,data=train_selected_R,
+                           mtry=13,importance=TRUE)
+bag_model_r
+predict_bag_r <- predict(bag_model_r,test_selected_R)
+
+#calculating RMSE, Rsw and MAE 
+print(postResample(pred = predict_bag_r, obs = test_selected_R$hour))
+
+```
+
+
+```{r}
+plot(predict_bag_r,test_selected_R$hour)
+abline(0,1)
+```
+
+# 6- Feature Selection
+
+## 6.1- PCA
+```{r}
+#build PCA model
+PCA_model <- prcomp(Absence_df_Dummy[,-c(62,63)], scale=FALSE)
+
+#Calculate the variance per PCA
+PCA_model_var <- round(((PCA_model$sdev^2)/sum(PCA_model$sdev^2))*100,0)
+
+#plot PCA
+plot10 <- (plot(cumsum(PCA_model_var), main="PCA Cumulative Percent Variance",
+                 xlab="Principal component",type="b", col="blue"))
+```
+
+## 6.3- Best subset selection 
+```{r}
+best_FS <- regsubsets(hour ~.-Absence, Absence_df, nvmax = 20)
+summary(best_FS)
+
+#Plot
+plot(summary(best_FS)$rss, xlab = "Number of features", ylab = "RSS", type = "l")
+
+plot(summary(best_FS)$adjr2, xlab = "Number of features",
+     ylab = "Adjusted RSq", type = "l")
+
+which.max(summary(best_FS)$adjr2)
+
+#see the selected features
+summary(best_FS)$which[which.max(summary(best_FS)$adjr2), ]
+```
+we can see tha reason,Age,Day,childern, Disciplinary_failure,Education,children 
+
+## 6.3- Forward subset selection
+```{r}
+Fwd_FS<- regsubsets(hour ~.-Absence,
+                    Absence_df, 
+                    nvmax = 20, 
+                    method = "forward")
+
+summary(Fwd_FS)
+
+plot(summary(Fwd_FS)$rss, xlab = "Number of features",
+ylab = "RSS", type = "l")
+
+
+plot(summary(Fwd_FS)$adjr2, xlab = "Number of features",
+ylab = "Adjusted RSq", type = "l")
+
+#Summary
+which.max(summary(Fwd_FS)$adjr2)
+coef(Fwd_FS, 15)
+coef(best_FS, 15)
+```
+
+@R-boot
+@R-randomForest
+@R-tree
+
+# 7- Model with PCA
+## 7.1- Regression
+```{r}
+Model_PCA <- pcr(hour~. ,data=train_selected_R, validation="CV")
+Predict_Model_PCA <- predict(Model_PCA, test_selected_R[,-40],ncomp=15)
+print(postResample(pred = Predict_Model_PCA, obs = test_selected_R$hour))
+```
+
