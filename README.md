@@ -56,12 +56,12 @@ library(randomForest) #Random Forest
 
 ### Code and Resources used
  R version : 4.0.5
- Packages: dplyr, readr, ggplot2, class, randomForest[@r], boot, tree
- [Dataset]{}
+ Packages: dplyr, readr, ggplot2, class, randomForest, boot, tree
+ [Dataset]{(http://archive.ics.uci.edu/ml/datasets/Absenteeism+at+work#)}
 
  
 ## Motivation 
-In following study we are going to address to one of the important workplace challenges that is absenteeism[@Kocakulah2016]. our aim is:
+In following study we are going to address to one of the important workplace challenges that is absenteeism. our aim is:
 
  - Focus on this as a measurable problem
  
@@ -79,13 +79,7 @@ Dataset is related to 740 records of absenteeism at work for three years (July 2
   - The response/label is one continues column (hour)
   - `46%`of observations have absence hour more that median
 
-
-\tiny
-```{r, results='asis',echo=FALSE}
-knitr::kable(head(Absence_df[,1:11]),caption = "Sample of Dataset",align=c("c","c","c","c","c","c","c","c","c","c"))
-knitr::kable(head(Absence_df[,12:21]),align=c("c","c","c","c","c","c","c","c","c","c"))
-```
-[^1]:\tiny[\textit{UCI Machine Learning Repository}](http://archive.ics.uci.edu/ml/datasets/Absenteeism+at+work#)
+[^1]:[\textit{UCI Machine Learning Repository}](http://archive.ics.uci.edu/ml/datasets/Absenteeism+at+work#)
 
 
 ## Data exploration by visualization
@@ -95,7 +89,6 @@ knitr::kable(head(Absence_df[,12:21]),align=c("c","c","c","c","c","c","c","c","c
  - Height, weight and body_mass have a high collinearity based on correlation matrix
 
 
-\tiny
 ![count of Absence reason](figure4.png){width=50%}|![count of Absence reason](figure5.png){width=50%}
 
 
@@ -112,12 +105,8 @@ Target: finding the class of absence time length
     - test accuracy `80.9%`
     - Pruning with optimal node 10 and`81.5%`+interpretable
 
-\tiny    
 ![K-fold](plotcv.png){width=50%}|![Tree](Tree.png){width=40%}
 
-```{r results='asis',echo=FALSE}
-#grid.arrange(graph2, graph3, ncol = 1)
-```
 ## Methods- Regression
 
 Target: predicting the absence hours
@@ -130,7 +119,6 @@ Target: predicting the absence hours
      - Number of terminal nodes is 16
      -  $R^2=0.07$ and $RMSE=14.62$ $MAE=6.38$
 
-\tiny
 ![](regression.png){width=100%}|
 
 ## Results 
@@ -155,10 +143,6 @@ Target: predicting the absence hours
 - Since the response label in balanced the stratification of data is not important
 
 ##
-
-  \begin{center}
-			\textbf{{\LARGE Thank You!}}
-		\end{center}
 		
 
 ## References 
