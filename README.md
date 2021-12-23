@@ -16,12 +16,7 @@ fontsize: 12pt
 bibliography: Project.bib
 nocite: | 
 ---
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(
-  echo = TRUE,
-  fig.width = 5,
-  message=FALSE, 
-  warning=FALSE)
+```{r}
 library(dplyr)
 library(Hmisc)
 library(magrittr)
@@ -49,49 +44,6 @@ library(pls)
 library(gridExtra)
 library(mgcv)         #GAM
 library(randomForest) #Random Forest
-#Reading CSV files
-Absence_df<- readr::read_csv("Absenteeism_at_work  UCI.csv")
-Absence_df2018<- readr::read_csv("Absenteeism_new_data.csv")
-
-#Summary of Dataset
-selected <- c("Distance_from_Residence_to_Work","Service_time", "Age",
-              "Work_load_Average/day_","Hit_target","Weight","Height",
-              "Absenteeism_time_in_hours","Transportation_expense")
-#Change the Colnames
-colnames(Absence_df) <- c('ID', 'Reason', 'Month', 'Day', 
-'Seasons','Tran_expense', 'Distance', 'Service_time', 'Age','Workload'
-, 'Hit_target', 'Disciplinary_failure', 'Education', 'children', 'drinker'
-, 'smoker', 'pet', 'weight', 'height', 'body_mass', 'hour')
-
-median(Absence_df$hour) # median will be separate point that is 3
-Absence_df <- mutate(Absence_df, Absence=ifelse(Absence_df$hour>3,1,0))
-
-# Percent of Absence "True" Label
-sum(Absence_df$Absence)/nrow(Absence_df)*100
-
-#Columns that are totally empty
-table(sapply(Absence_df,function(x)all(is.na(x))))
-table(sapply(Absence_df2018,function(x)all(is.na(x))))
-
-#Columns with NA 
-table(lapply(Absence_df,function(x){length(which(is.na(x)))}))
-table(lapply(Absence_df2018,function(x){length(which(is.na(x)))}))
-
-#Change null reasons with the mode
-Absence_df$Reason[Absence_df$Reason %in% 0] =23
-
-Absence_df<-dplyr::filter(Absence_df,Month!=0)
-
-#Absence_df$Absence<-ifelse(Absence_df$Absence==0,"short", "long")
-graph2 <- ggplot(Absence_df,aes(x=Reason,fill=factor(Absence)))+geom_bar(stat="count")+
-  stat_count(geom = "text", colour = "black", size = 3.5,
-aes(label = ..count..),position=position_stack(vjust=0.5))+
-  labs( x = "Reason of Absence", y = "Count of reasons", fill = "Absence length")+scale_x_continuous(labels=Absence_df$Reason, breaks=Absence_df$Reason)
-
-#Distribution of hour
-graph3<-ggplot(Absence_df, aes(x=hour))+geom_bar()+
-  ggtitle("Distribution of absence hour ")+theme_classic()
-```
 
 ## Outline
  - Data exploration
