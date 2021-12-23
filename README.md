@@ -1,7 +1,3 @@
-
- Absenteeism at work prediction
-================
-
 ---
 title: |
   Prediction of Absenteeism 
