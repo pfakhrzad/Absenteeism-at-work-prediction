@@ -7,8 +7,7 @@ date: "12/01/2021"
 output: 
   beamer_presentation:
 fontsize: 11pt
-bibliography: Project.bib
-nocite: | 
+bibliography: Project.bib | 
 ---
 ```{r}
 library(dplyr)
