@@ -78,7 +78,7 @@ Dataset is related to 740 records of absenteeism at work for three years (July 2
   - The response/label is one continues column (hour)
   - `46%`of observations have absence hour more that median
 
-[^1]:[\textit{UCI Machine Learning Repository}](http://archive.ics.uci.edu/ml/datasets/Absenteeism+at+work#)
+[^1]:[{UCI Machine Learning Repository}](http://archive.ics.uci.edu/ml/datasets/Absenteeism+at+work#)
 
 
 ## Data exploration by visualization
@@ -88,7 +88,7 @@ Dataset is related to 740 records of absenteeism at work for three years (July 2
  - Height, weight and body_mass have a high collinearity based on correlation matrix
 
 
-![count of Absence reason](figure4.png){width=50%}|![count of Absence reason](figure5.png){width=50%}
+![count of Absence reason](Reasons.png){width=50%}|![count of Absence reason](Children.png){width=50%}
 
 
 ## Methods- Classification
