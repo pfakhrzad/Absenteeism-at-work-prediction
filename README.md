@@ -54,12 +54,10 @@ library(randomForest) #Random Forest
  - Discussion
  
 
-\tiny 
 ### Code and Resources used
-\tiny
  R version : 4.0.5
  Packages: dplyr, readr, ggplot2, class, randomForest[@r], boot, tree
- Dataset[@UCI]
+ [Dataset]{}
 
  
 ## Motivation 
